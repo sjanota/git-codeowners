@@ -24,7 +24,7 @@ You may also provide list of people who have already approved your PR. Rules tha
 out:
 
 ```
-$ g codeowners @sjanota
+$ git codeowners @sjanota
 => /resources/proj2 [@octocat]
 	* resources/core/charts/configurations-generator/templates/deployment.yaml
 	* resources/core/charts/configurations-generator/values.yaml
