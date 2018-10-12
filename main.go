@@ -5,11 +5,9 @@ import (
 	"log"
 	"fmt"
 	"github.com/nathanleiby/github-codeowners"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/gitignore"
 	"strings"
+	"os/exec"
+	"gopkg.in/src-d/go-git.v4/plumbing/format/gitignore"
 )
 
 type match struct {
@@ -22,9 +20,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot get cwd: %v", err)
 	}
+	root := getRootDir(wd)
 
-	coMappings := loadCodeOwnersMappings(wd)
-	changedFiles := getChangedFiles(wd)
+	coMappings := loadCodeOwnersMappings(root)
+	changedFiles := getChangedFiles(root)
 
 	matchingMappings := make(map[string]*match)
 
@@ -94,69 +93,23 @@ func loadCodeOwnersMappings(wd string) []parser.Mapping {
 }
 
 func getChangedFiles(wd string) []string {
-	repo, err := git.PlainOpen(wd)
+	cmd := exec.Command("git", "diff", "--name-only", "master...HEAD")
+	cmd.Dir = wd
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("Error while opening repository: %v", err)
+		log.Fatalf("Error while getting diff: %v, %s", err, string(out))
 	}
 
-	masterTree, err := getBranchTree(repo, "master")
-	if err != nil {
-		log.Fatalf("Error while reading master tree: %v", err)
-	}
-
-	head, err := repo.Head()
-	if err != nil {
-		log.Fatalf("Error while reading HEAD: %v", err)
-	}
-
-	headTree, err := getReferenceTree(repo, head)
-	if err != nil {
-		log.Fatalf("Error while reading HEAD tree: %v", err)
-	}
-
-	patch ,err := masterTree.Patch(headTree)
-	if err != nil {
-		log.Fatalf("Error while calculating patch from master to HEAD: %v", err)
-	}
-
-	changed := make(map[string]bool)
-	for _, patch := range patch.FilePatches() {
-		from, to := patch.Files()
-		if to != nil && to.Path() != "" {
-			changed[to.Path()] = true
-		}
-		if from != nil && from.Path() != "" {
-			changed[from.Path()] = true
-		}
-	}
-
-	result := make([]string, 0)
-	for f := range changed {
-		result = append(result, f)
-	}
-
-	return result
+	return strings.Split(strings.TrimSpace(string(out)), "\n")
 }
 
-func getBranchTree(repo *git.Repository, branchName string) (*object.Tree, error) {
-	branch, err := repo.Branch(branchName)
+func getRootDir(wd string) string {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Dir = wd
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		log.Fatalf("Error while getting root: %v, %s", err, string(out))
 	}
 
-	ref, err := repo.Reference(branch.Merge, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return getReferenceTree(repo, ref)
-}
-
-func getReferenceTree(repo *git.Repository, ref *plumbing.Reference) (*object.Tree, error) {
-	commit, err := repo.CommitObject(ref.Hash())
-	if err != nil {
-		return nil, err
-	}
-
-	return commit.Tree()
+	return strings.TrimSpace(string(out))
 }
