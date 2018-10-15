@@ -16,14 +16,9 @@ type match struct {
 }
 
 func main() {
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Cannot get cwd: %v", err)
-	}
-	root := getRootDir(wd)
-
+	root := getRootDir()
 	coMappings := loadCodeOwnersMappings(root)
-	changedFiles := getChangedFiles(root)
+	changedFiles := getChangedFiles()
 
 	matchingMappings := make(map[string]*match)
 
@@ -92,9 +87,8 @@ func loadCodeOwnersMappings(wd string) []parser.Mapping {
 	return coMapping
 }
 
-func getChangedFiles(wd string) []string {
+func getChangedFiles() []string {
 	cmd := exec.Command("git", "diff", "--name-only", "master...HEAD")
-	cmd.Dir = wd
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("Error while getting diff: %v, %s", err, string(out))
@@ -103,9 +97,8 @@ func getChangedFiles(wd string) []string {
 	return strings.Split(strings.TrimSpace(string(out)), "\n")
 }
 
-func getRootDir(wd string) string {
+func getRootDir() string {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Dir = wd
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("Error while getting root: %v, %s", err, string(out))
